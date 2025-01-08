@@ -18,6 +18,7 @@ const CollectorFinancialsView = () => {
     queryFn: async () => {
       console.log('Fetching financial totals');
       
+      // Get all payments without pagination
       const { data: payments, error: paymentsError } = await supabase
         .from('payment_requests')
         .select('amount, status, payment_type');
@@ -27,15 +28,18 @@ const CollectorFinancialsView = () => {
         throw paymentsError;
       }
 
+      // Get all collectors without pagination
       const { data: collectors, error: collectorsError } = await supabase
         .from('members_collectors')
-        .select('*');
+        .select('*')
+        .eq('active', true);
 
       if (collectorsError) {
         console.error('Error fetching collectors:', collectorsError);
         throw collectorsError;
       }
 
+      // Get all members without pagination for total calculations
       const { data: members, error: membersError } = await supabase
         .from('members')
         .select('yearly_payment_amount, emergency_collection_amount, yearly_payment_status, emergency_collection_status');
@@ -45,24 +49,36 @@ const CollectorFinancialsView = () => {
         throw membersError;
       }
 
+      // Calculate total amount collected from approved payments
       const totalAmount = payments?.reduce((sum, payment) => 
         payment.status === 'approved' ? sum + Number(payment.amount) : sum, 0
       ) || 0;
 
+      // Calculate pending amount from pending payments
       const pendingAmount = payments?.reduce((sum, payment) => 
         payment.status === 'pending' ? sum + Number(payment.amount) : sum, 0
       ) || 0;
 
+      // Calculate total yearly due (£40 per member)
       const totalYearlyDue = members?.reduce((sum, member) => 
         sum + (member.yearly_payment_amount || 40), 0
       ) || 0;
 
+      // Calculate total emergency due
       const totalEmergencyDue = members?.reduce((sum, member) => 
         sum + (member.emergency_collection_amount || 0), 0
       ) || 0;
 
+      // Calculate total collection due and remaining
       const totalCollectionDue = totalYearlyDue + totalEmergencyDue;
       const remainingCollection = totalCollectionDue - totalAmount;
+
+      console.log('Calculated totals:', {
+        totalCollected: totalAmount,
+        pendingAmount,
+        remainingAmount: remainingCollection,
+        totalCollectors: collectors?.length || 0
+      });
 
       return {
         totalCollected: totalAmount,
