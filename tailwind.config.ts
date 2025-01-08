@@ -24,6 +24,25 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        dashboard: {
+          dark: "#141413",
+          light: "#FAFAF8",
+          accent1: "#8989DE",
+          accent2: "#61AAF2",
+          accent3: "#7EBF8E",
+          text: "#C4C3BB",
+          muted: "#828179",
+          card: "#1A1A19",
+          warning: "#FFD700",
+          // Adding new color variations
+          cardHover: "#222221",
+          cardBorder: "#2A2A29",
+          cardBorderHover: "#3A3A39",
+          highlight: "#9B87F5",
+          success: "#4CAF50",
+          error: "#FF5252",
+          info: "#2196F3"
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -53,13 +72,10 @@ export default {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      fontFamily: {
-        mono: ["JetBrains Mono", "monospace"],
-        sans: ["Inter", "sans-serif"],
-      },
-      backgroundImage: {
-        'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-        'hero-gradient': 'linear-gradient(to bottom right, #3b82f6, #1d4ed8)',
+      borderRadius: {
+        lg: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
         "accordion-down": {
