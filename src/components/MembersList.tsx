@@ -14,10 +14,13 @@ interface MembersListProps {
   userRole: string | null;
 }
 
+const ITEMS_PER_PAGE = 20;
+
 const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   const [isEditProfileDialogOpen, setIsEditProfileDialogOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const { toast } = useToast();
 
   const { data: collectorInfo } = useQuery({
@@ -41,9 +44,12 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
   });
 
   const { data: membersData, isLoading, refetch } = useQuery({
-    queryKey: ['members', searchTerm, userRole],
+    queryKey: ['members', searchTerm, userRole, page],
     queryFn: async () => {
       console.log('Fetching members with search term:', searchTerm);
+      const from = (page - 1) * ITEMS_PER_PAGE;
+      const to = from + ITEMS_PER_PAGE - 1;
+
       let query = supabase
         .from('members')
         .select('*', { count: 'exact' });
@@ -69,7 +75,8 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
       }
       
       const { data, count, error } = await query
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .range(from, to);
       
       if (error) {
         console.error('Error fetching members:', error);
@@ -85,6 +92,7 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
   });
 
   const members = membersData?.members || [];
+  const totalPages = Math.ceil((membersData?.totalCount || 0) / ITEMS_PER_PAGE);
   const selectedMember = members?.find(m => m.id === selectedMemberId);
 
   const handleProfileUpdated = () => {
@@ -103,14 +111,6 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
     setIsEditProfileDialogOpen(true);
   };
 
-  const handlePrint = () => {
-    if (collectorInfo) {
-      console.log('Printing members for collector:', collectorInfo.name);
-      // The actual print functionality is handled by the PrintButtons component
-      // which is rendered inside MembersListHeader
-    }
-  };
-
   return (
     <div className="space-y-6">
       <MembersListHeader 
@@ -119,7 +119,6 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
         collectorInfo={collectorInfo}
         selectedMember={selectedMember}
         onProfileUpdated={handleProfileUpdated}
-        onPrint={handlePrint}
       />
 
       <MembersListContent
@@ -128,6 +127,9 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
         userRole={userRole}
         onPaymentClick={handlePaymentClick}
         onEditClick={handleEditClick}
+        currentPage={page}
+        totalPages={totalPages}
+        onPageChange={setPage}
       />
 
       {selectedMember && isPaymentDialogOpen && (
