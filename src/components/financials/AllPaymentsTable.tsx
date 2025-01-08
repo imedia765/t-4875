@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { format } from "date-fns";
-import { Check, X } from "lucide-react";
+import { Check, X, AlertCircle, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -24,56 +24,37 @@ const AllPaymentsTable = ({ showHistory = false }: AllPaymentsTableProps) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const [page, setPage] = React.useState<number>(1);
-  const [itemsPerPage, setItemsPerPage] = React.useState<number>(10);
-
-  const { data: paymentsData, isLoading } = useQuery({
-    queryKey: ['payment-requests', page, itemsPerPage],
+  const { data: paymentsData, isLoading, error } = useQuery({
+    queryKey: ['payment-requests'],
     queryFn: async () => {
-      const from = (page - 1) * itemsPerPage;
-      const to = from + itemsPerPage - 1;
-
-      // Get paginated payment data
+      // Get all payment data without pagination
       const { data, error, count } = await supabase
         .from('payment_requests')
         .select(`
           *,
-          members!payment_requests_member_id_fkey(full_name),
-          collectors:members_collectors(name)
-        `, { count: 'exact', head: false })
-        .order('created_at', { ascending: false })
-        .range(from, to)
-        .limit(null);
+          members!payment_requests_member_id_fkey(
+            full_name,
+            member_number,
+            phone,
+            email
+          ),
+          collectors:members_collectors(
+            name,
+            phone,
+            email
+          )
+        `, { count: 'exact' })
+        .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching payments:', error);
+        throw error;
+      }
 
-      // Get total member count
-      const { count: totalMembers } = await supabase
-        .from('members')
-        .select('*', { count: 'exact', head: true });
-
-      // Calculate totals based on actual member count
-      const yearlyFee = 40;
-      const totalExpected = (totalMembers || 0) * yearlyFee;
-      const totalCollected = (data || [])
-        .filter(p => p.status === 'approved')
-        .reduce((sum, p) => sum + (p.amount || 0), 0);
-      const remainingToCollect = totalExpected - totalCollected;
-
-      return {
-        data,
-        count,
-        totals: {
-          totalExpected,
-          totalCollected,
-          remainingToCollect
-        }
-      };
+      console.log('Fetched payment data:', data);
+      return { data, count };
     },
   });
-
-  const totalPages = Math.ceil((paymentsData?.count || 0) / itemsPerPage);
-  const payments = paymentsData?.data || [];
 
   const handleApproval = async (paymentId: string, approved: boolean) => {
     try {
@@ -106,7 +87,47 @@ const AllPaymentsTable = ({ showHistory = false }: AllPaymentsTableProps) => {
   };
 
   if (isLoading) {
-    return null;
+    return (
+      <Card className="bg-dashboard-card border-dashboard-accent1/20 rounded-lg">
+        <div className="p-6">
+          <h2 className="text-xl font-medium text-white mb-4">Payment History & Approvals</h2>
+          <div className="flex items-center gap-2 text-white">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span>Loading payment history...</span>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-dashboard-card border-dashboard-accent1/20 rounded-lg">
+        <div className="p-6">
+          <h2 className="text-xl font-medium text-white mb-4">Payment History & Approvals</h2>
+          <div className="flex items-center gap-2 text-red-500">
+            <AlertCircle className="h-4 w-4" />
+            <span>Error loading payment history: {error.message}</span>
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  const payments = paymentsData?.data || [];
+
+  if (!payments.length) {
+    return (
+      <Card className="bg-dashboard-card border-dashboard-accent1/20 rounded-lg">
+        <div className="p-6">
+          <h2 className="text-xl font-medium text-white mb-4">Payment History & Approvals</h2>
+          <div className="flex items-center gap-2 text-white">
+            <AlertCircle className="h-4 w-4" />
+            <span>No payment history found.</span>
+          </div>
+        </div>
+      </Card>
+    );
   }
 
   return (
@@ -119,7 +140,10 @@ const AllPaymentsTable = ({ showHistory = false }: AllPaymentsTableProps) => {
               <TableRow className="border-white/10 hover:bg-white/5">
                 <TableHead className="text-dashboard-text">Date</TableHead>
                 <TableHead className="text-dashboard-text">Member</TableHead>
+                <TableHead className="text-dashboard-text">Member Number</TableHead>
+                <TableHead className="text-dashboard-text">Contact</TableHead>
                 <TableHead className="text-dashboard-text">Collector</TableHead>
+                <TableHead className="text-dashboard-text">Collector Contact</TableHead>
                 <TableHead className="text-dashboard-text">Type</TableHead>
                 <TableHead className="text-dashboard-text">Amount</TableHead>
                 <TableHead className="text-dashboard-text">Status</TableHead>
@@ -127,7 +151,7 @@ const AllPaymentsTable = ({ showHistory = false }: AllPaymentsTableProps) => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments?.map((payment) => (
+              {payments.map((payment) => (
                 <TableRow 
                   key={payment.id}
                   className="border-white/10 hover:bg-white/5"
@@ -138,8 +162,23 @@ const AllPaymentsTable = ({ showHistory = false }: AllPaymentsTableProps) => {
                   <TableCell className="text-white font-medium">
                     {payment.members?.full_name}
                   </TableCell>
+                  <TableCell className="text-dashboard-text">
+                    {payment.members?.member_number}
+                  </TableCell>
+                  <TableCell className="text-dashboard-text">
+                    <div className="flex flex-col">
+                      <span>{payment.members?.phone}</span>
+                      <span className="text-sm text-gray-400">{payment.members?.email}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="text-dashboard-accent1">
                     {payment.collectors?.name}
+                  </TableCell>
+                  <TableCell className="text-dashboard-text">
+                    <div className="flex flex-col">
+                      <span>{payment.collectors?.phone}</span>
+                      <span className="text-sm text-gray-400">{payment.collectors?.email}</span>
+                    </div>
                   </TableCell>
                   <TableCell className="capitalize text-dashboard-text">
                     {payment.payment_type}
