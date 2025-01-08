@@ -74,6 +74,11 @@ const CollectorFinancialsView = () => {
     }
   });
 
+  const handlePrint = () => {
+    console.log('Print functionality triggered');
+    // Add print logic here if needed
+  };
+
   return (
     <div className="space-y-3 sm:space-y-4 md:space-y-6">
       <header className="mb-3 sm:mb-4 md:mb-6">
@@ -92,7 +97,8 @@ const CollectorFinancialsView = () => {
               items={[{
                 count: `£${totals.totalCollected.toLocaleString()}`,
                 label: "Total Amount Collected",
-                icon: <Wallet className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-emerald-400" />
+                icon: <Wallet className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-emerald-400" />,
+                onPrint: handlePrint
               }]}
             />
           </div>
@@ -102,7 +108,8 @@ const CollectorFinancialsView = () => {
               items={[{
                 count: `£${totals.pendingAmount.toLocaleString()}`,
                 label: "Pending Amount",
-                icon: <Receipt className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-amber-400" />
+                icon: <Receipt className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-amber-400" />,
+                onPrint: handlePrint
               }]}
             />
           </div>
@@ -112,7 +119,8 @@ const CollectorFinancialsView = () => {
               items={[{
                 count: `£${totals.remainingAmount.toLocaleString()}`,
                 label: "Remaining to Collect",
-                icon: <PoundSterling className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-rose-400" />
+                icon: <PoundSterling className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-rose-400" />,
+                onPrint: handlePrint
               }]}
             />
           </div>
@@ -122,7 +130,8 @@ const CollectorFinancialsView = () => {
               items={[{
                 count: totals.totalCollectors,
                 label: "Active Collectors",
-                icon: <Users className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-indigo-400" />
+                icon: <Users className="h-3.5 sm:h-4 md:h-5 w-3.5 sm:w-4 md:w-5 text-indigo-400" />,
+                onPrint: handlePrint
               }]}
             />
           </div>
