@@ -126,16 +126,16 @@ const MembersList = ({ searchTerm, userRole }: MembersListProps) => {
       />
 
       <DashboardTabs defaultValue="members" className="w-full">
-        <DashboardTabsList>
-          <DashboardTabsTrigger value="members">
+        <DashboardTabsList className="w-full grid grid-cols-1 sm:grid-cols-3 gap-0">
+          <DashboardTabsTrigger value="members" className="w-full">
             Members List
           </DashboardTabsTrigger>
           {userRole === 'collector' && (
             <>
-              <DashboardTabsTrigger value="payments">
+              <DashboardTabsTrigger value="payments" className="w-full">
                 Payments
               </DashboardTabsTrigger>
-              <DashboardTabsTrigger value="summary">
+              <DashboardTabsTrigger value="summary" className="w-full">
                 Summary
               </DashboardTabsTrigger>
             </>
