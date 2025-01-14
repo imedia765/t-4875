@@ -11,7 +11,7 @@ const DashboardTabsList = React.forwardRef<
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "w-full bg-dashboard-card border-b border-dashboard-cardBorder p-1",
+      "w-full bg-dashboard-card border border-dashboard-cardBorder rounded-lg p-1",
       className
     )}
     {...props}
@@ -26,7 +26,7 @@ const DashboardTabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex-1 px-3 py-2.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-dashboard-accent1 data-[state=active]:text-white rounded-lg mx-1",
+      "w-full px-3 py-2.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-dashboard-accent1 data-[state=active]:text-white rounded-lg",
       className
     )}
     {...props}
