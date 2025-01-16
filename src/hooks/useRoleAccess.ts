@@ -92,12 +92,16 @@ export const useRoleAccess = () => {
           let userRole: UserRole = null;
           if (roles.includes('admin')) {
             userRole = 'admin';
+            console.log('User has admin role');
           } else if (roles.includes('collector')) {
             userRole = 'collector';
+            console.log('User has collector role');
           } else if (roles.includes('member')) {
             userRole = 'member';
+            console.log('User has member role');
           }
           
+          console.log('Final role determination:', { userRole, userRoles });
           return { userRole, userRoles };
         }
 
