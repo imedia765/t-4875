@@ -64,14 +64,14 @@ export const useRoleAccess = () => {
       }
 
       console.log('Fetching roles for user:', sessionData.user.id);
+      console.log('User email:', sessionData.user.email);
       
       try {
         console.log('Querying user_roles table...');
         const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
           .select('*')
-          .eq('user_id', sessionData.user.id)
-          .order('created_at', { ascending: false });
+          .eq('user_id', sessionData.user.id);
 
         if (roleError) {
           console.error('Error fetching roles:', roleError);
@@ -79,6 +79,11 @@ export const useRoleAccess = () => {
         }
 
         console.log('Raw role data from database:', roleData);
+        console.log('SQL query details:', {
+          table: 'user_roles',
+          user_id: sessionData.user.id,
+          resultCount: roleData?.length || 0
+        });
 
         if (roleData && roleData.length > 0) {
           console.log('Found roles in database:', roleData);
