@@ -39,7 +39,7 @@ export const CollectorRolesList = () => {
           .from('user_roles')
           .insert([{ 
             user_id: userId, 
-            role: role as AppRole 
+            role 
           }]);
         if (insertError) {
           console.error('[CollectorRolesList] Insert error:', insertError);
