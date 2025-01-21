@@ -69,22 +69,7 @@ export const useRoleAccess = () => {
           throw memberError;
         }
 
-        if (memberData?.member_number) {
-          const { data: collectorData, error: collectorError } = await supabase
-            .from('members_collectors')
-            .select('*')
-            .eq('member_number', memberData.member_number)
-            .eq('active', true)
-            .maybeSingle();
-
-          if (collectorError && collectorError.code !== 'PGRST116') {
-            console.error('[RoleAccess] Error checking collector status:', collectorError);
-          } else {
-            console.log('[RoleAccess] Collector check result:', collectorData);
-          }
-        }
-        
-        // Then fetch all roles with retry logic
+        // Fetch all roles with retry logic and no caching
         let retryCount = 0;
         const maxRetries = 3;
         let roleData = null;
@@ -95,7 +80,11 @@ export const useRoleAccess = () => {
             const { data, error: rolesError } = await supabase
               .from('user_roles')
               .select('*')
-              .eq('user_id', session.user.id);
+              .eq('user_id', session.user.id)
+              .options({
+                head: false,
+                count: 'exact'
+              });
 
             if (rolesError) throw rolesError;
             roleData = data;
@@ -145,14 +134,6 @@ export const useRoleAccess = () => {
           variant: "destructive",
         });
 
-        if (error instanceof TypeError && error.message === 'Failed to fetch') {
-          console.log('[RoleAccess] Network error, falling back to member role');
-          const fallbackRole = 'member' as UserRole;
-          setUserRoles([fallbackRole]);
-          setUserRole(fallbackRole);
-          return [fallbackRole];
-        }
-
         setError(error);
         throw error;
       } finally {
@@ -161,9 +142,11 @@ export const useRoleAccess = () => {
     },
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    staleTime: 0, // Changed from 5 minutes to 0 to ensure fresh data
+    staleTime: 0,
+    cacheTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
+    refetchInterval: 5000 // Poll every 5 seconds
   });
 
   const hasRole = (role: UserRole): boolean => {
