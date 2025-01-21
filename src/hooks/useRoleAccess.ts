@@ -1,193 +1,161 @@
-import { useState, useEffect } from 'react';
+import { Database } from "@/integrations/supabase/types";
+import { useRoleStore } from '@/store/roleStore';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from 'react-router-dom';
-import { BaseUserRole, UserRole, UserRoles } from '@/types/member';
 
-const ROLE_STALE_TIME = 0;
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 1000;
+export type UserRole = Database['public']['Enums']['app_role'];
+
+interface RoleState {
+  userRole: UserRole | null;
+  userRoles: UserRole[] | null;
+  isLoading: boolean;
+  error: Error | null;
+  permissions: {
+    canManageUsers: boolean;
+    canCollectPayments: boolean;
+    canAccessSystem: boolean;
+    canViewAudit: boolean;
+    canManageCollectors: boolean;
+  };
+}
 
 export const useRoleAccess = () => {
   const { toast } = useToast();
-  const navigate = useNavigate();
-
-  const { data: sessionData, error: sessionError } = useQuery({
-    queryKey: ['session'],
-    queryFn: async () => {
-      try {
-        console.log('Checking session status...');
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        if (session) {
-          console.log('Found session for user:', session.user.id);
-          const { error: userError } = await supabase.auth.getUser();
-          if (userError) throw userError;
-        }
-        
-        return session;
-      } catch (error: any) {
-        console.error('Session error:', error);
-        await supabase.auth.signOut();
-        localStorage.clear();
-        throw error;
-      }
-    },
-    retry: MAX_RETRIES,
-    retryDelay: RETRY_DELAY,
-  });
-
-  useEffect(() => {
-    if (sessionError) {
-      console.error('Session error:', sessionError);
-      toast({
-        title: "Session expired",
-        description: "Please sign in again",
-        variant: "destructive",
-      });
-      navigate('/login');
-    }
-  }, [sessionError, navigate, toast]);
-
-  const { 
-    data: roleData, 
-    isLoading: roleLoading, 
-    error: roleError 
-  } = useQuery({
-    queryKey: ['userRoles', sessionData?.user?.id],
-    queryFn: async () => {
-      if (!sessionData?.user) {
-        console.log('No session found in role check');
-        return { userRole: null, userRoles: null };
-      }
-
-      console.log('Fetching roles for user:', sessionData.user.id);
-      console.log('User email:', sessionData.user.email);
-      
-      try {
-        console.log('Querying user_roles table...');
-        const { data: roleData, error: roleError } = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', sessionData.user.id);
-
-        if (roleError) {
-          console.error('Error fetching roles:', roleError);
-          throw roleError;
-        }
-
-        console.log('Raw role data from database:', roleData);
-        console.log('SQL query details:', {
-          table: 'user_roles',
-          user_id: sessionData.user.id,
-          resultCount: roleData?.length || 0
-        });
-
-        if (roleData && roleData.length > 0) {
-          console.log('Found roles in database:', roleData);
-          const roles = roleData.map(r => r.role as BaseUserRole);
-          console.log('Mapped roles:', roles);
-          
-          // Store all roles
-          const userRoles = roles as UserRoles;
-          
-          // Determine highest priority role
-          let userRole: UserRole = null;
-          if (roles.includes('admin')) {
-            userRole = 'admin';
-            console.log('User has admin role');
-          } else if (roles.includes('collector')) {
-            userRole = 'collector';
-            console.log('User has collector role');
-          } else if (roles.includes('member')) {
-            userRole = 'member';
-            console.log('User has member role');
-          }
-          
-          console.log('Final role determination:', { userRole, userRoles });
-          return { userRole, userRoles };
-        }
-
-        // Fallback checks for collector and member status
-        if (sessionData.user.user_metadata.member_number) {
-          console.log('Checking collector status...');
-          const { data: collectorData } = await supabase
-            .from('members_collectors')
-            .select('name')
-            .eq('member_number', sessionData.user.user_metadata.member_number)
-            .maybeSingle();
-
-          if (collectorData) {
-            console.log('User is a collector');
-            return { 
-              userRole: 'collector' as UserRole, 
-              userRoles: ['collector'] as UserRoles 
-            };
-          }
-
-          console.log('User is a regular member');
-          return { 
-            userRole: 'member' as UserRole, 
-            userRoles: ['member'] as UserRoles 
-          };
-        }
-
-        console.log('No role found, defaulting to member');
-        return { 
-          userRole: 'member' as UserRole, 
-          userRoles: ['member'] as UserRoles 
-        };
-      } catch (error) {
-        console.error('Error in role check:', error);
-        throw error;
-      }
-    },
-    enabled: !!sessionData?.user?.id,
-    staleTime: ROLE_STALE_TIME,
-    cacheTime: ROLE_STALE_TIME,
-    retry: MAX_RETRIES,
-    retryDelay: RETRY_DELAY,
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-  });
-
-  const hasRole = (role: BaseUserRole): boolean => {
-    return roleData?.userRoles?.includes(role) || false;
+  const {
+    userRole,
+    userRoles,
+    isLoading: roleLoading,
+    error,
+    permissions,
+    setUserRole,
+    setUserRoles,
+    setIsLoading,
+    setError
+  } = useRoleStore() as RoleState & {
+    setUserRole: (role: UserRole | null) => void;
+    setUserRoles: (roles: UserRole[] | null) => void;
+    setIsLoading: (loading: boolean) => void;
+    setError: (error: Error | null) => void;
   };
 
-  const hasAnyRole = (roles: BaseUserRole[]): boolean => {
+  useQuery({
+    queryKey: ['userRoles'],
+    queryFn: async () => {
+      console.log('[RoleAccess] Fetching user roles - start');
+      setIsLoading(true);
+      
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (!session?.user) {
+          console.log('[RoleAccess] No authenticated session found');
+          setUserRoles(null);
+          setUserRole(null);
+          return null;
+        }
+
+        console.log('[RoleAccess] Fetching roles for user:', session.user.id);
+        
+        const { data: roles, error: rolesError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id);
+
+        if (rolesError) {
+          console.error('[RoleAccess] Error fetching roles:', rolesError);
+          toast({
+            title: "Error fetching roles",
+            description: "There was a problem loading your access permissions. Please refresh the page.",
+            variant: "destructive",
+          });
+          throw rolesError;
+        }
+
+        const userRoles = roles?.map(r => r.role as UserRole) || ['member'];
+        console.log('[RoleAccess] Fetched roles:', {
+          roles: userRoles,
+          timestamp: new Date().toISOString()
+        });
+
+        // Set primary role (admin > collector > member)
+        const primaryRole = userRoles.includes('admin' as UserRole) 
+          ? 'admin' as UserRole 
+          : userRoles.includes('collector' as UserRole)
+            ? 'collector' as UserRole
+            : 'member' as UserRole;
+
+        console.log('[RoleAccess] Setting primary role:', primaryRole);
+        
+        setUserRoles(userRoles);
+        setUserRole(primaryRole);
+        return userRoles;
+      } catch (error: any) {
+        console.error('[RoleAccess] Role fetch error:', error);
+        setError(error);
+        throw error;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    retry: 3,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    staleTime: 1000 * 60 * 5,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
+  });
+
+  const hasRole = (role: UserRole): boolean => {
+    console.log('[RoleAccess] Checking role:', { 
+      role, 
+      userRole, 
+      userRoles,
+      timestamp: new Date().toISOString()
+    });
+    if (!userRoles) return false;
+    return userRoles.includes(role);
+  };
+
+  const hasAnyRole = (roles: UserRole[]): boolean => {
     return roles.some(role => hasRole(role));
   };
 
   const canAccessTab = (tab: string): boolean => {
-    console.log('Checking access for tab:', tab, 'User roles:', roleData?.userRoles);
-    
-    if (!roleData?.userRoles) return false;
+    if (!userRoles) return false;
 
-    if (hasRole('admin')) {
-      return ['dashboard', 'users', 'collectors', 'audit', 'system', 'financials'].includes(tab);
-    }
-    
-    if (hasRole('collector')) {
-      return ['dashboard', 'users'].includes(tab);
-    }
-    
-    if (hasRole('member')) {
-      return tab === 'dashboard';
-    }
+    const result = (() => {
+      switch (tab) {
+        case 'dashboard':
+          return true;
+        case 'users':
+          return hasRole('admin') || hasRole('collector');
+        case 'financials':
+          return hasRole('admin') || hasRole('collector');
+        case 'system':
+          return hasRole('admin');
+        default:
+          return false;
+      }
+    })();
 
-    return false;
+    console.log('[RoleAccess] Tab access check:', {
+      tab,
+      hasAccess: result,
+      userRoles,
+      timestamp: new Date().toISOString()
+    });
+
+    return result;
   };
 
   return {
-    userRole: roleData?.userRole ?? null,
-    userRoles: roleData?.userRoles ?? null,
-    roleLoading: roleLoading || !sessionData,
-    error: roleError,
-    canAccessTab,
+    userRole,
+    userRoles,
+    roleLoading,
+    error,
+    permissions,
     hasRole,
-    hasAnyRole
+    hasAnyRole,
+    canAccessTab
   };
 };

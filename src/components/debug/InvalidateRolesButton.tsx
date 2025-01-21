@@ -13,8 +13,8 @@ const InvalidateRolesButton = () => {
       
       if (session?.user?.id) {
         console.log('Invalidating cache for user:', session.user.id);
-        await queryClient.invalidateQueries(['userRoles', session.user.id]);
-        await queryClient.refetchQueries(['userRoles', session.user.id]);
+        await queryClient.invalidateQueries({ queryKey: ['userRoles', session.user.id] });
+        await queryClient.refetchQueries({ queryKey: ['userRoles', session.user.id] });
         
         toast({
           title: "Cache Invalidated",
