@@ -32,12 +32,7 @@ export const useRoleAccess = () => {
     setUserRoles,
     setIsLoading,
     setError
-  } = useRoleStore() as RoleState & {
-    setUserRole: (role: UserRole | null) => void;
-    setUserRoles: (roles: UserRole[] | null) => void;
-    setIsLoading: (loading: boolean) => void;
-    setError: (error: Error | null) => void;
-  };
+  } = useRoleStore();
 
   useQuery({
     queryKey: ['userRoles'],
@@ -84,20 +79,14 @@ export const useRoleAccess = () => {
         
         // Then fetch all roles
         console.log('[RoleAccess] Fetching user roles from database...');
-        const { data: roleData, error: roleError } = await supabase
+        let roleData = await supabase
           .from('user_roles')
           .select('*')
-          .eq('user_id', session.user.id);
-
-        if (roleError) {
-          console.error('[RoleAccess] Error fetching roles:', roleError);
-          toast({
-            title: "Error fetching roles",
-            description: "There was a problem loading your access permissions. Please refresh the page.",
-            variant: "destructive",
+          .eq('user_id', session.user.id)
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return data;
           });
-          throw roleError;
-        }
 
         console.log('[RoleAccess] Raw role data from database:', roleData);
 
@@ -110,13 +99,15 @@ export const useRoleAccess = () => {
           } else {
             console.log('[RoleAccess] Role sync completed');
             // Fetch roles again after sync
-            const { data: updatedRoles } = await supabase
+            const { data: updatedRoles, error: fetchError } = await supabase
               .from('user_roles')
               .select('*')
               .eq('user_id', session.user.id);
+            
+            if (fetchError) throw fetchError;
             if (updatedRoles) {
               console.log('[RoleAccess] Updated roles after sync:', updatedRoles);
-              roleData = updatedRoles;
+              roleData = updatedRoles;  // Now this assignment is valid
             }
           }
         }
