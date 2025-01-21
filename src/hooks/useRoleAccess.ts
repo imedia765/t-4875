@@ -58,23 +58,30 @@ export const useRoleAccess = () => {
 
         // First check if user is a collector
         console.log('[RoleAccess] Checking collector status...');
-        const { data: collectorData, error: collectorError } = await supabase
-          .from('members_collectors')
-          .select('*')
-          .eq('member_number', (
-            await supabase
-              .from('members')
-              .select('member_number')
-              .eq('auth_user_id', session.user.id)
-              .single()
-          ).data?.member_number)
-          .eq('active', true)
-          .single();
+        const { data: memberData, error: memberError } = await supabase
+          .from('members')
+          .select('member_number')
+          .eq('auth_user_id', session.user.id)
+          .maybeSingle();
 
-        if (collectorError && collectorError.code !== 'PGRST116') {
-          console.error('[RoleAccess] Error checking collector status:', collectorError);
-        } else {
-          console.log('[RoleAccess] Collector check result:', collectorData);
+        if (memberError && memberError.code !== 'PGRST116') {
+          console.error('[RoleAccess] Error checking member status:', memberError);
+          throw memberError;
+        }
+
+        if (memberData?.member_number) {
+          const { data: collectorData, error: collectorError } = await supabase
+            .from('members_collectors')
+            .select('*')
+            .eq('member_number', memberData.member_number)
+            .eq('active', true)
+            .maybeSingle();
+
+          if (collectorError && collectorError.code !== 'PGRST116') {
+            console.error('[RoleAccess] Error checking collector status:', collectorError);
+          } else {
+            console.log('[RoleAccess] Collector check result:', collectorData);
+          }
         }
         
         // Then fetch all roles
@@ -89,28 +96,6 @@ export const useRoleAccess = () => {
           });
 
         console.log('[RoleAccess] Raw role data from database:', roleData);
-
-        // If user is a collector but doesn't have collector role, trigger sync
-        if (collectorData && !roleData?.some(r => r.role === 'collector')) {
-          console.log('[RoleAccess] Collector found but role missing, triggering sync...');
-          const { error: syncError } = await supabase.rpc('perform_user_roles_sync');
-          if (syncError) {
-            console.error('[RoleAccess] Error during role sync:', syncError);
-          } else {
-            console.log('[RoleAccess] Role sync completed');
-            // Fetch roles again after sync
-            const { data: updatedRoles, error: fetchError } = await supabase
-              .from('user_roles')
-              .select('*')
-              .eq('user_id', session.user.id);
-            
-            if (fetchError) throw fetchError;
-            if (updatedRoles) {
-              console.log('[RoleAccess] Updated roles after sync:', updatedRoles);
-              roleData = updatedRoles;  // Now this assignment is valid
-            }
-          }
-        }
 
         const userRoles = roleData?.map(r => r.role as UserRole) || ['member'];
         console.log('[RoleAccess] Mapped roles:', userRoles);
