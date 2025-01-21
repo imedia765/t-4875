@@ -80,11 +80,7 @@ export const useRoleAccess = () => {
             const { data, error: rolesError } = await supabase
               .from('user_roles')
               .select('*')
-              .eq('user_id', session.user.id)
-              .options({
-                head: false,
-                count: 'exact'
-              });
+              .eq('user_id', session.user.id);
 
             if (rolesError) throw rolesError;
             roleData = data;
@@ -143,7 +139,7 @@ export const useRoleAccess = () => {
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     staleTime: 0,
-    cacheTime: 0,
+    gcTime: 0,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
     refetchInterval: 5000 // Poll every 5 seconds
