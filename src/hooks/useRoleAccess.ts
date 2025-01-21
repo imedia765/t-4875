@@ -34,7 +34,7 @@ export const useRoleAccess = () => {
     setError
   } = useRoleStore();
 
-  useQuery({
+  const { data: fetchedRoles, refetch } = useQuery({
     queryKey: ['userRoles'],
     queryFn: async () => {
       console.log('[RoleAccess] Starting role fetch process...');
@@ -139,14 +139,12 @@ export const useRoleAccess = () => {
       } catch (error: any) {
         console.error('[RoleAccess] Role fetch error:', error);
         
-        // Show user-friendly error toast
         toast({
           title: "Error fetching roles",
           description: "There was a problem loading your permissions. Please try again.",
           variant: "destructive",
         });
 
-        // Set default member role if network error
         if (error instanceof TypeError && error.message === 'Failed to fetch') {
           console.log('[RoleAccess] Network error, falling back to member role');
           const fallbackRole = 'member' as UserRole;
@@ -163,7 +161,7 @@ export const useRoleAccess = () => {
     },
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0, // Changed from 5 minutes to 0 to ensure fresh data
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
@@ -219,6 +217,7 @@ export const useRoleAccess = () => {
     permissions,
     hasRole,
     hasAnyRole,
-    canAccessTab
+    canAccessTab,
+    refetchRoles: refetch
   };
 };
