@@ -42,7 +42,7 @@ export const useRoleAccess = () => {
   useQuery({
     queryKey: ['userRoles'],
     queryFn: async () => {
-      console.log('[RoleAccess] Fetching user roles - start');
+      console.log('[RoleAccess] Starting role fetch process...');
       setIsLoading(true);
       
       try {
@@ -55,28 +55,74 @@ export const useRoleAccess = () => {
           return null;
         }
 
-        console.log('[RoleAccess] Fetching roles for user:', session.user.id);
+        console.log('[RoleAccess] Fetching roles for user:', {
+          userId: session.user.id,
+          email: session.user.email,
+          timestamp: new Date().toISOString()
+        });
+
+        // First check if user is a collector
+        console.log('[RoleAccess] Checking collector status...');
+        const { data: collectorData, error: collectorError } = await supabase
+          .from('members_collectors')
+          .select('*')
+          .eq('member_number', (
+            await supabase
+              .from('members')
+              .select('member_number')
+              .eq('auth_user_id', session.user.id)
+              .single()
+          ).data?.member_number)
+          .eq('active', true)
+          .single();
+
+        if (collectorError && collectorError.code !== 'PGRST116') {
+          console.error('[RoleAccess] Error checking collector status:', collectorError);
+        } else {
+          console.log('[RoleAccess] Collector check result:', collectorData);
+        }
         
-        const { data: roles, error: rolesError } = await supabase
+        // Then fetch all roles
+        console.log('[RoleAccess] Fetching user roles from database...');
+        const { data: roleData, error: roleError } = await supabase
           .from('user_roles')
-          .select('role')
+          .select('*')
           .eq('user_id', session.user.id);
 
-        if (rolesError) {
-          console.error('[RoleAccess] Error fetching roles:', rolesError);
+        if (roleError) {
+          console.error('[RoleAccess] Error fetching roles:', roleError);
           toast({
             title: "Error fetching roles",
             description: "There was a problem loading your access permissions. Please refresh the page.",
             variant: "destructive",
           });
-          throw rolesError;
+          throw roleError;
         }
 
-        const userRoles = roles?.map(r => r.role as UserRole) || ['member'];
-        console.log('[RoleAccess] Fetched roles:', {
-          roles: userRoles,
-          timestamp: new Date().toISOString()
-        });
+        console.log('[RoleAccess] Raw role data from database:', roleData);
+
+        // If user is a collector but doesn't have collector role, trigger sync
+        if (collectorData && !roleData?.some(r => r.role === 'collector')) {
+          console.log('[RoleAccess] Collector found but role missing, triggering sync...');
+          const { error: syncError } = await supabase.rpc('perform_user_roles_sync');
+          if (syncError) {
+            console.error('[RoleAccess] Error during role sync:', syncError);
+          } else {
+            console.log('[RoleAccess] Role sync completed');
+            // Fetch roles again after sync
+            const { data: updatedRoles } = await supabase
+              .from('user_roles')
+              .select('*')
+              .eq('user_id', session.user.id);
+            if (updatedRoles) {
+              console.log('[RoleAccess] Updated roles after sync:', updatedRoles);
+              roleData = updatedRoles;
+            }
+          }
+        }
+
+        const userRoles = roleData?.map(r => r.role as UserRole) || ['member'];
+        console.log('[RoleAccess] Mapped roles:', userRoles);
 
         // Set primary role (admin > collector > member)
         const primaryRole = userRoles.includes('admin' as UserRole) 
@@ -85,7 +131,11 @@ export const useRoleAccess = () => {
             ? 'collector' as UserRole
             : 'member' as UserRole;
 
-        console.log('[RoleAccess] Setting primary role:', primaryRole);
+        console.log('[RoleAccess] Final role determination:', {
+          userRole: primaryRole,
+          userRoles,
+          timestamp: new Date().toISOString()
+        });
         
         setUserRoles(userRoles);
         setUserRole(primaryRole);
