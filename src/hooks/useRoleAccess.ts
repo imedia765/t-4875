@@ -84,16 +84,36 @@ export const useRoleAccess = () => {
           }
         }
         
-        // Then fetch all roles
-        console.log('[RoleAccess] Fetching user roles from database...');
-        let roleData = await supabase
-          .from('user_roles')
-          .select('*')
-          .eq('user_id', session.user.id)
-          .then(({ data, error }) => {
-            if (error) throw error;
-            return data;
-          });
+        // Then fetch all roles with retry logic
+        let retryCount = 0;
+        const maxRetries = 3;
+        let roleData = null;
+        let lastError = null;
+
+        while (retryCount < maxRetries) {
+          try {
+            const { data, error: rolesError } = await supabase
+              .from('user_roles')
+              .select('*')
+              .eq('user_id', session.user.id);
+
+            if (rolesError) throw rolesError;
+            roleData = data;
+            break;
+          } catch (err) {
+            lastError = err;
+            retryCount++;
+            console.log(`[RoleAccess] Retry ${retryCount} of ${maxRetries} for role fetch`);
+            if (retryCount < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+            }
+          }
+        }
+
+        if (!roleData && lastError) {
+          console.error('[RoleAccess] All role fetch retries failed:', lastError);
+          throw lastError;
+        }
 
         console.log('[RoleAccess] Raw role data from database:', roleData);
 
@@ -118,6 +138,23 @@ export const useRoleAccess = () => {
         return userRoles;
       } catch (error: any) {
         console.error('[RoleAccess] Role fetch error:', error);
+        
+        // Show user-friendly error toast
+        toast({
+          title: "Error fetching roles",
+          description: "There was a problem loading your permissions. Please try again.",
+          variant: "destructive",
+        });
+
+        // Set default member role if network error
+        if (error instanceof TypeError && error.message === 'Failed to fetch') {
+          console.log('[RoleAccess] Network error, falling back to member role');
+          const fallbackRole = 'member' as UserRole;
+          setUserRoles([fallbackRole]);
+          setUserRole(fallbackRole);
+          return [fallbackRole];
+        }
+
         setError(error);
         throw error;
       } finally {
