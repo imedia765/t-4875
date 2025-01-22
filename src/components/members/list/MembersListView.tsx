@@ -74,19 +74,6 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
     },
   });
 
-  const handlePaymentClick = (memberId: string) => {
-    setSelectedMemberId(memberId);
-  };
-
-  const handleEditClick = (memberId: string) => {
-    console.log('Edit clicked for member:', memberId);
-  };
-
-  // Update page state if we had to adjust it
-  if (membersData?.currentPage && membersData.currentPage !== page) {
-    setPage(membersData.currentPage);
-  }
-
   return (
     <DashboardTabs defaultValue="members" className="w-full">
       <DashboardTabsList className="w-full grid grid-cols-1 sm:grid-cols-3 gap-0">
@@ -97,6 +84,7 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
           </>
         )}
         <DashboardTabsTrigger value="members">Members List</DashboardTabsTrigger>
+        <DashboardTabsTrigger value="notes">Notes</DashboardTabsTrigger>
       </DashboardTabsList>
 
       {userRole === 'collector' && collectorInfo && (
@@ -119,9 +107,43 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
           currentPage={page}
           totalPages={Math.ceil((membersData?.totalCount || 0) / ITEMS_PER_PAGE)}
           onPageChange={setPage}
-          onPaymentClick={handlePaymentClick}
-          onEditClick={handleEditClick}
+          onPaymentClick={(id) => setSelectedMemberId(id)}
+          onEditClick={(id) => setSelectedMemberId(id)}
         />
+      </DashboardTabsContent>
+
+      <DashboardTabsContent value="notes">
+        <div className="space-y-4">
+          {membersData?.members
+            .filter(member => member.admin_note)
+            .map(member => (
+              <div 
+                key={member.id}
+                className="bg-dashboard-card p-4 rounded-lg border border-dashboard-cardBorder"
+              >
+                <div className="flex flex-col space-y-2">
+                  <div className="flex justify-between items-start">
+                    <h3 className="text-dashboard-accent1 font-medium">
+                      {member.full_name}
+                    </h3>
+                    <span className="text-sm text-dashboard-muted">
+                      Member #: {member.member_number}
+                    </span>
+                  </div>
+                  <div className="bg-dashboard-cardHover p-3 rounded-md">
+                    <p className="text-sm text-dashboard-text whitespace-pre-wrap">
+                      {member.admin_note}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          {(!membersData?.members.some(member => member.admin_note)) && (
+            <div className="text-center text-dashboard-muted py-8">
+              No notes available
+            </div>
+          )}
+        </div>
       </DashboardTabsContent>
     </DashboardTabs>
   );
