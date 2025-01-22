@@ -6,6 +6,7 @@ import CollectorMemberPayments from '../CollectorMemberPayments';
 import MembersListContent from './MembersListContent';
 import { DashboardTabs, DashboardTabsList, DashboardTabsTrigger, DashboardTabsContent } from "@/components/ui/dashboard-tabs";
 import CollectorPaymentSummary from '@/components/CollectorPaymentSummary';
+import RoleBasedRenderer from '@/components/RoleBasedRenderer';
 
 interface MembersListViewProps {
   searchTerm: string;
@@ -84,7 +85,9 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
           </>
         )}
         <DashboardTabsTrigger value="members">Members List</DashboardTabsTrigger>
-        <DashboardTabsTrigger value="notes">Notes</DashboardTabsTrigger>
+        <RoleBasedRenderer allowedRoles={['admin']}>
+          <DashboardTabsTrigger value="notes">Notes</DashboardTabsTrigger>
+        </RoleBasedRenderer>
       </DashboardTabsList>
 
       {userRole === 'collector' && collectorInfo && (
@@ -112,39 +115,41 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
         />
       </DashboardTabsContent>
 
-      <DashboardTabsContent value="notes">
-        <div className="space-y-4">
-          {membersData?.members
-            .filter(member => member.admin_note)
-            .map(member => (
-              <div 
-                key={member.id}
-                className="bg-dashboard-card p-4 rounded-lg border border-dashboard-cardBorder"
-              >
-                <div className="flex flex-col space-y-2">
-                  <div className="flex justify-between items-start">
-                    <h3 className="text-dashboard-accent1 font-medium">
-                      {member.full_name}
-                    </h3>
-                    <span className="text-sm text-dashboard-muted">
-                      Member #: {member.member_number}
-                    </span>
-                  </div>
-                  <div className="bg-dashboard-cardHover p-3 rounded-md">
-                    <p className="text-sm text-dashboard-text whitespace-pre-wrap">
-                      {member.admin_note}
-                    </p>
+      <RoleBasedRenderer allowedRoles={['admin']}>
+        <DashboardTabsContent value="notes">
+          <div className="space-y-4">
+            {membersData?.members
+              .filter(member => member.admin_note)
+              .map(member => (
+                <div 
+                  key={member.id}
+                  className="bg-dashboard-card p-4 rounded-lg border border-dashboard-cardBorder"
+                >
+                  <div className="flex flex-col space-y-2">
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-dashboard-accent1 font-medium">
+                        {member.full_name}
+                      </h3>
+                      <span className="text-sm text-dashboard-muted">
+                        Member #: {member.member_number}
+                      </span>
+                    </div>
+                    <div className="bg-dashboard-cardHover p-3 rounded-md">
+                      <p className="text-sm text-dashboard-text whitespace-pre-wrap">
+                        {member.admin_note}
+                      </p>
+                    </div>
                   </div>
                 </div>
+              ))}
+            {(!membersData?.members.some(member => member.admin_note)) && (
+              <div className="text-center text-dashboard-muted py-8">
+                No notes available
               </div>
-            ))}
-          {(!membersData?.members.some(member => member.admin_note)) && (
-            <div className="text-center text-dashboard-muted py-8">
-              No notes available
-            </div>
-          )}
-        </div>
-      </DashboardTabsContent>
+            )}
+          </div>
+        </DashboardTabsContent>
+      </RoleBasedRenderer>
     </DashboardTabs>
   );
 };
