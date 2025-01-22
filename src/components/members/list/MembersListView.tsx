@@ -19,21 +19,23 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
   const ITEMS_PER_PAGE = 20;
 
   const { data: membersData, isLoading } = useQuery({
-    queryKey: ['members', searchTerm, userRole, page],
+    queryKey: ['members', searchTerm, userRole, page, collectorInfo?.name],
     queryFn: async () => {
       console.log('Fetching members with search term:', searchTerm);
+      console.log('Collector info:', collectorInfo);
       
       // First get total count
-      const countQuery = supabase
+      let countQuery = supabase
         .from('members')
         .select('*', { count: 'exact', head: true });
       
       if (searchTerm) {
-        countQuery.or(`full_name.ilike.%${searchTerm}%,member_number.ilike.%${searchTerm}%,collector.ilike.%${searchTerm}%`);
+        countQuery = countQuery.or(`full_name.ilike.%${searchTerm}%,member_number.ilike.%${searchTerm}%,collector.ilike.%${searchTerm}%`);
       }
 
+      // If user is a collector, only show their assigned members
       if (userRole === 'collector' && collectorInfo?.name) {
-        countQuery.eq('collector', collectorInfo.name);
+        countQuery = countQuery.eq('collector', collectorInfo.name);
       }
       
       const { count } = await countQuery;
@@ -53,6 +55,7 @@ const MembersListView = ({ searchTerm, userRole, collectorInfo }: MembersListVie
         query = query.or(`full_name.ilike.%${searchTerm}%,member_number.ilike.%${searchTerm}%,collector.ilike.%${searchTerm}%`);
       }
 
+      // If user is a collector, only show their assigned members
       if (userRole === 'collector' && collectorInfo?.name) {
         query = query.eq('collector', collectorInfo.name);
       }
